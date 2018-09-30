@@ -5,13 +5,7 @@ $(document).ready(function () {
     $('#info').hide();
     $('#loading_indicator').hide();
 
-    //  Location of client
-    var geocode;
-
-    //  Google map
-    var map;
-    var zoom_level = 14;
-    var search_radius = 1;// kilometers
+    var search_radius = 3;// kilometers
 
     //	Check for browser location capability
     if (navigator.geolocation) {
@@ -55,31 +49,9 @@ $(document).ready(function () {
         });
     }
 
-    function getPosition(position) {
+    function getPosition(geocode) {
         $('#loading_indicator').show();
-
-        geocode = position;
-
-        createMap(geocode.coords.latitude, geocode.coords.longitude);
-
         updateTweets(geocode.coords.latitude, geocode.coords.longitude);
-    }
-
-    function createMap(latitude, longitude){
-        var center = new google.maps.LatLng(latitude, longitude);
-
-        var mapOptions = {
-            center: center,
-            zoom: zoom_level,
-            mapTypeId: google.maps.MapTypeId.ROADMAP
-
-        };
-        map = new google.maps.Map(document.getElementById("map_canvas"), mapOptions);
-
-        //  Set center when browser is resized
-        google.maps.event.addDomListener(window, 'resize', function() {
-            map.setCenter(center);
-        });
     }
 
     function updateTweets(latitude, longitude) {
@@ -87,7 +59,9 @@ $(document).ready(function () {
         $.ajax({
             url: "/authenticate.php?lat=" + latitude + "&lng=" + longitude + "&rad=" + search_radius,
             success: function (data) {
+                console.log(data);
                 var json_object = $.parseJSON(data);//  Parse string
+                console.log(json_object);
                 if(json_object !== null){
                     processTweets(json_object['statuses']);//   Ignore meta data on request
                 }
@@ -103,47 +77,27 @@ $(document).ready(function () {
         //  For each tweet
         var count = 1;//  Marker count
         $.each(json, function (i, item) {
-            if(item.geo !== null){
+            console.log(item);
+            if(item.created_at !== null){
 
-                //  Append markers to the map
-                var latLng = new google.maps.LatLng(item.geo.coordinates[0], item.geo.coordinates[1]);
-                var image = {
-                    url: 'http://chart.apis.google.com/chart?chst=d_map_pin_letter&chld='+ count +'|00ACEE|ffffff',
-                    // This marker is 20 pixels wide by 32 pixels tall.
-                    size: new google.maps.Size(24, 32),
-                    // The origin for this image is 0,0.
-                    origin: new google.maps.Point(0,0),
-                    // The anchor for this image is the base of the flagpole at 0,32.
-                    anchor: new google.maps.Point(0, 32)
-                };
-                var marker = new google.maps.Marker({
-                    position: latLng,
-                    map: map,
-                    animation: google.maps.Animation.DROP,
-                    icon: image
-                });
-
-                //  pop up for markers
-                var iw1 = new google.maps.InfoWindow({
-                    content: item.text,
-                    maxWidth: 300
-                });
-                google.maps.event.addListener(marker, "click", function (e) { iw1.open(map, this); });
-
-
-                //  Calculate time since tweet happened
                 var tweet_time = new Date(item.created_at);
                 var now = new Date();
                 var difference = now - tweet_time;
                 var time = calculateTime(difference);
 
-                $("ol#tweets").append(
-                    "<li><span class='tweet_img'><img src=" + item.user.profile_image_url + " alt='img_" + item.id + "' /></span>" +
-                        "<span class='tweet_data'><span class='tweet_user'><a target='_blank' href='https://twitter.com/" + item.user.screen_name + "'>@" + item.user.screen_name + "</a></span>" +
-                        "<span class='tweet_time'>posted " + time + " ago...</span>" +
-                        "<p class='tweet_text'>" + item.text + "</p>" +
-                        "</span></li>"
-                );
+                var theTweet =
+                    "<li>" +
+                      "<span class='tweet_img'>" +
+                        "<img src=" + item.user.profile_image_url + " alt='img_" + item.id + "' />" +
+                      "</span>" +
+                    "<span class='tweet_data'>" +
+                      "<span class='tweet_user'>" +
+                        "<a target='_blank' href='https://twitter.com/" + item.user.screen_name + "'>@" + item.user.screen_name + "</a>" +
+                      "</span>" +
+                    "<span class='tweet_time'>posted " + time + " ago...</span>" +
+                    "<p class='tweet_text'>" + item.text + "</p>" +
+                    "</span></li>";
+                $("ol#tweets").append(theTweet);
                 count++;//  Marker count
             }
         });
@@ -189,11 +143,16 @@ $(document).ready(function () {
             success: function (data) {
                 $('#post_code').hide();
                 $('#loading_indicator').show();
-
-                var loc = $.parseJSON(data);
-
-                createMap(loc['lat'], loc['lng']);
-                updateTweets(loc['lat'], loc['lng']);
+                var dataJson = $.parseJSON(data);
+                console.log(dataJson);
+                if (dataJson['status'] != 200) {
+                    console.log('Error with the post code lookup.');
+                    return;
+                }
+                var lat = dataJson['result']['latitude'];
+                var lng = dataJson['result']['longitude'];
+                //createMap(lat, lng);
+                updateTweets(lat, lng);
             }
         });
     }
